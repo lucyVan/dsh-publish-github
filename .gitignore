@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+.pnpm/
+
+# build / logs
+*.log
+dist/
+coverage/
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# local env
+.env
+.env.local

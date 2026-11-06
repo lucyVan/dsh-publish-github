@@ -1,0 +1,41 @@
+{
+  "name": "dsh-publish-github",
+  "version": "0.1.0",
+  "description": "Publish any local directory to GitHub from inside a DSH session with a /publish slash command: git init, gh repo create, commit and push. Never force-pushes, never deletes.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "github",
+    "publish",
+    "slash-command"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "lucyVan",
+    "url": "https://github.com/lucyVan"
+  },
+  "homepage": "https://github.com/lucyVan/dsh-publish-github",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucyVan/dsh-publish-github.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lucyVan/dsh-publish-github/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

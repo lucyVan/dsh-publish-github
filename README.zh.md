@@ -1,0 +1,91 @@
+# dsh-publish-github
+
+给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 用的 **GitHub 发布插件**：在主输入框敲一条命令，把当前机器上任意目录发布成 GitHub 仓库——自动 `git init`、建仓库、提交、推送，不用离开会话。
+
+## 它做什么
+
+```
+/publish <目录>   →   git init（如需）→ git add -A → commit（首个提交）
+                  →   有 origin 就 push；没有就 gh repo create --source . --push
+```
+
+一条命令走完整个发布流程，结果以逐行 ✓/✗ 报告回显在会话里。
+
+## 为什么是斜杠命令而不是模型工具
+
+DSH 的 `@deepseek-ai/*` 包只存在于 Electron 的 `app.asar` 里，磁盘上的外部插件**无法 import**，因此 `ctx.tools.register` 的官方写法对外部插件不可用。本插件改用宿主 `ctx.commands.register` 注册 `/publish`，不依赖任何内部包，挂载即可生效。
+
+## 安装
+
+```bash
+# GitHub
+dsh plugin --profile desktop add github:lucyVan/dsh-publish-github
+
+# 本地路径
+dsh plugin --profile desktop add /absolute/path/to/dsh-publish-github
+```
+
+安装后**重启 DSH**。首次使用前需要 GitHub 授权，二选一：
+
+```bash
+# 方式 A：gh CLI 登录（推荐）
+brew install gh
+gh auth login
+
+# 方式 B：在 DSH 凭据里保存 GITHUB_TOKEN，插件会以 GH_TOKEN 注入 gh 子进程
+```
+
+## 使用
+
+```
+/publish /path/to/your/project
+```
+
+可选参数：
+
+| 参数 | 作用 |
+|---|---|
+| `--private` | 建私有仓库（默认 public） |
+| `--name <repo>` | 指定仓库名（默认取目录名） |
+| `--message "<msg>"` | 提交信息 / 仓库描述（默认 `Publish <repo>`） |
+
+示例：
+
+```
+/publish ~/IdeaProjects/my-plugin --private --name best-plugin --message "My first DSH plugin"
+```
+
+## 安全边界
+
+- **永不** force push、删除分支、reset 历史——参数里出现这类词会直接被拒；
+- 目录已存在 `origin` 时只做普通 `push`，不重建远程；
+- 子进程环境会剥离 `DSH_*` 变量，不把 harness 自身配置透给 gh；
+- 但**允许发布任意目录**（这是刻意的：用户点名的路径就是授权范围）。
+
+## 前置条件
+
+| 依赖 | 说明 |
+|---|---|
+| `git` | 必需 |
+| `gh` | 必需（`brew install gh`） |
+| GitHub 认证 | `gh auth login` 或 DSH 凭据里的 `GITHUB_TOKEN` |
+| Node | `>= 22` |
+
+## 已知限制
+
+- 只有 `/publish` 命令，没有配套设置页（GitHub 账号信息走 gh CLI 或 DSH 凭据）；
+- 不做 npm 发布，只做 GitHub 仓库；
+- 首次提交的作者固定为 `DSH <dsh@localhost>`（可在提交后自行 amend）；
+- 不做冲突处理：如果远程已有内容且历史不相关，push 会失败并原样报错。
+
+## 卸载
+
+```bash
+dsh plugin --profile desktop remove dsh-publish-github
+```
+
+然后重启 DSH。
+
+## 许可
+
+MIT（见 [LICENSE](LICENSE)）
