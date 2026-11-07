@@ -27,13 +27,23 @@ dsh plugin --profile desktop add /absolute/path/to/dsh-publish-github
 
 Restart DSH afterwards. Authorize GitHub once, either way:
 
-```bash
-# Option A: gh CLI login (recommended)
-brew install gh
-gh auth login
+Install `gh` and log in (any one option):
 
-# Option B: save GITHUB_TOKEN in DSH credentials — the plugin injects it as GH_TOKEN
+```bash
+# macOS
+brew install gh
+
+# Windows (PowerShell / winget)
+winget install --id GitHub.cli
+
+# Linux (Debian/Ubuntu)
+sudo apt install gh
+
+# Then log in (same on every platform)
+gh auth login
 ```
+
+Alternatively, save `GITHUB_TOKEN` in DSH credentials — the plugin injects it as `GH_TOKEN` into the `gh` child process, so gh's own login is not required.
 
 ## Usage
 
@@ -76,7 +86,7 @@ Example:
 | Dependency | Notes |
 |---|---|
 | `git` | required |
-| `gh` | required (`brew install gh`) |
+| `gh` | required (macOS `brew install gh` / Windows `winget install GitHub.cli` / Linux `apt install gh`) |
 | GitHub auth | `gh auth login`, or a `GITHUB_TOKEN` in DSH credentials |
 | Node | `>= 22` |
 

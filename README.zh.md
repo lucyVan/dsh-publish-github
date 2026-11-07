@@ -27,13 +27,23 @@ dsh plugin --profile desktop add /absolute/path/to/dsh-publish-github
 
 安装后**重启 DSH**。首次使用前需要 GitHub 授权，二选一：
 
-```bash
-# 方式 A：gh CLI 登录（推荐）
-brew install gh
-gh auth login
+先安装 `gh` 并登录（任选其一）：
 
-# 方式 B：在 DSH 凭据里保存 GITHUB_TOKEN，插件会以 GH_TOKEN 注入 gh 子进程
+```bash
+# macOS
+brew install gh
+
+# Windows（PowerShell / winget）
+winget install --id GitHub.cli
+
+# Linux（Debian/Ubuntu）
+sudo apt install gh
+
+# 然后登录（三平台通用）
+gh auth login
 ```
+
+也可以不在 DSH 里存 token，改用 gh 自己的登录态。若希望由 DSH 管理凭据，在 DSH 凭据里保存 `GITHUB_TOKEN`，插件会以 `GH_TOKEN` 注入 gh 子进程。
 
 ## 使用
 
@@ -76,7 +86,7 @@ gh auth login
 | 依赖 | 说明 |
 |---|---|
 | `git` | 必需 |
-| `gh` | 必需（`brew install gh`） |
+| `gh` | 必需（macOS `brew install gh` / Windows `winget install GitHub.cli` / Linux `apt install gh`） |
 | GitHub 认证 | `gh auth login` 或 DSH 凭据里的 `GITHUB_TOKEN` |
 | Node | `>= 22` |
 

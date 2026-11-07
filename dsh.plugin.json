@@ -1,0 +1,16 @@
+{
+  "id": "dsh-publish-github",
+  "version": "0.1.0",
+  "main": "./index.js",
+  "description": "Publish any local directory to GitHub from inside a DSH session with a /publish slash command.",
+  "contributes": {
+    "tools": [],
+    "skills": []
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lucyVan/dsh-publish-github",
+  "testedWith": {
+    "dsh": "0.2.2-rc.1",
+    "note": "metadata only; DSH does not read this file"
+  }
+}
