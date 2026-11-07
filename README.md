@@ -101,12 +101,20 @@ Example:
 
 | Item | Status |
 |---|---|
-| DSH version | Verified on `0.2.2-rc.1`; declares `engines.dsh: >=0.2.2-rc.1 <0.3.0-0` |
+| DSH version | Verified on `0.2.2-rc.1`; declares `engines.dsh: >=0.2.2-rc.1 <0.3.0-0`; DSH rejects an incompatible host at install time |
 | Platform | Tested on macOS; **Windows untested**, with three adaptations in place: `gh`/`gh.exe`/`gh.cmd`/`gh.bat` are probed in order, arguments honour quotes (including backslash paths), and the commit author is configurable |
 | npm dependencies | **None**: only `node:*` built-ins, no `@deepseek-ai/*` imports |
 | Browser module dependencies | **None**: host-only plugin, no client half |
 | Required external tools | `git` and `gh`, both on `PATH` |
 | Install | Declares `dsh.bundle`, so `dsh plugin add` registers it as a profile layer automatically — no manual patch editing |
+
+> **After a DSH upgrade the plugin may refuse to install**: `engines.dsh` is enforced by DSH, which rejects an out-of-window host and explains that running it may crash or corrupt data. To try an unverified host anyway, use DSH's exact-version exemption:
+>
+> ```bash
+> dsh plugin --profile <name> allow-version <package>@<version> --dsh-version <host-version> --accept-risk
+> ```
+>
+> Back up your workspace first. The host APIs this plugin relies on (`ctx.commands.register`, the right-sidebar tabs, `agents.create`'s seed semantics) can still change between release candidates.
 
 Install verification: `dsh plugin --profile web add github:lucyVan/dsh-publish-github` was run in an isolated `DSH_HOME`.
 

@@ -101,12 +101,20 @@ gh auth login
 
 | 项 | 状态 |
 |---|---|
-| DSH 版本 | 验证于 `0.2.2-rc.1`；声明 `engines.dsh: >=0.2.2-rc.1 <0.3.0-0` |
+| DSH 版本 | 验证于 `0.2.2-rc.1`；声明 `engines.dsh: >=0.2.2-rc.1 <0.3.0-0`，不合规环境安装期即被 DSH 拒绝 |
 | 平台 | macOS 实测通过；**Windows 未实测**，但已做三处适配：命令按 `gh`/`gh.exe`/`gh.cmd`/`gh.bat` 依次探测、参数支持引号包裹（含反斜杠路径）、提交作者可配置 |
 | npm 依赖 | **零依赖**：只用 `node:*` 内置模块，不 import 任何 `@deepseek-ai/*` |
 | 浏览器模块依赖 | **零**：纯 host 插件，无 client 半部 |
 | 必需外部工具 | `git`、`gh`（均需在 PATH 中） |
 | 安装 | 带 `dsh.bundle` 声明，`dsh plugin add` 会自动登记为 profile layer，无需手工改 patch |
+
+> **DSH 升级后装不上怎么办**：`engines.dsh` 由 DSH 强制检查，宿主版本超出窗口时安装会被拒绝（并提示可能崩溃或数据损坏）。确需在未验证版本上试跑，可用 DSH 自带的精确版本豁免：
+>
+> ```bash
+> dsh plugin --profile <name> allow-version <包名>@<版本> --dsh-version <宿主版本> --accept-risk
+> ```
+>
+> 试跑前请先备份工作区。本插件依赖的宿主接口（`ctx.commands.register`、右栏 tab、`agents.create` 的 seed 语义）在 rc 阶段仍可能变动。
 
 安装验证：在隔离 `DSH_HOME` 中用 `dsh plugin --profile web add github:lucyVan/dsh-publish-github` 实测通过。
 
