@@ -48,6 +48,15 @@ gh auth login
 | `--private` | 建私有仓库（默认 public） |
 | `--name <repo>` | 指定仓库名（默认取目录名） |
 | `--message "<msg>"` | 提交信息 / 仓库描述（默认 `Publish <repo>`） |
+| `--author <name>` | 首次提交的作者名（默认沿用 git 全局配置） |
+| `--email <addr>` | 首次提交的作者邮箱（默认沿用 git 全局配置） |
+
+路径含空格时用引号包裹，Windows 路径同样适用：
+
+```
+/publish "C:\Users\me\My Projects" --private
+/publish "/Users/me/My Projects" --name my-project
+```
 
 示例：
 
@@ -77,6 +86,19 @@ gh auth login
 - 不做 npm 发布，只做 GitHub 仓库；
 - 首次提交的作者固定为 `DSH <dsh@localhost>`（可在提交后自行 amend）；
 - 不做冲突处理：如果远程已有内容且历史不相关，push 会失败并原样报错。
+
+## 兼容性
+
+| 项 | 状态 |
+|---|---|
+| DSH 版本 | 验证于 `0.2.2-rc.1`；声明 `engines.dsh: >=0.2.2-rc.1 <0.3.0-0` |
+| 平台 | macOS 实测通过；**Windows 未实测**，但已做三处适配：命令按 `gh`/`gh.exe`/`gh.cmd`/`gh.bat` 依次探测、参数支持引号包裹（含反斜杠路径）、提交作者可配置 |
+| npm 依赖 | **零依赖**：只用 `node:*` 内置模块，不 import 任何 `@deepseek-ai/*` |
+| 浏览器模块依赖 | **零**：纯 host 插件，无 client 半部 |
+| 必需外部工具 | `git`、`gh`（均需在 PATH 中） |
+| 安装 | 带 `dsh.bundle` 声明，`dsh plugin add` 会自动登记为 profile layer，无需手工改 patch |
+
+安装验证：在隔离 `DSH_HOME` 中用 `dsh plugin --profile web add github:lucyVan/dsh-publish-github` 实测通过。
 
 ## 卸载
 

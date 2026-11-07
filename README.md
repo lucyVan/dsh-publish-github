@@ -48,6 +48,15 @@ Options:
 | `--private` | Create a private repository (public by default) |
 | `--name <repo>` | Repository name (defaults to the directory basename) |
 | `--message "<msg>"` | Commit message / repository description (default `Publish <repo>`) |
+| `--author <name>` | Author name for the first commit (defaults to your git config) |
+| `--email <addr>` | Author email for the first commit (defaults to your git config) |
+
+Quote paths that contain spaces — Windows paths work the same way:
+
+```
+/publish "C:\Users\me\My Projects" --private
+/publish "/Users/me/My Projects" --name my-project
+```
 
 Example:
 
@@ -77,6 +86,19 @@ Example:
 - GitHub repositories only — no npm publishing;
 - The first commit is authored as `DSH <dsh@localhost>` (amend it afterwards if you prefer);
 - No conflict handling: if the remote already has unrelated history, the push fails and the error is reported verbatim.
+
+## Compatibility
+
+| Item | Status |
+|---|---|
+| DSH version | Verified on `0.2.2-rc.1`; declares `engines.dsh: >=0.2.2-rc.1 <0.3.0-0` |
+| Platform | Tested on macOS; **Windows untested**, with three adaptations in place: `gh`/`gh.exe`/`gh.cmd`/`gh.bat` are probed in order, arguments honour quotes (including backslash paths), and the commit author is configurable |
+| npm dependencies | **None**: only `node:*` built-ins, no `@deepseek-ai/*` imports |
+| Browser module dependencies | **None**: host-only plugin, no client half |
+| Required external tools | `git` and `gh`, both on `PATH` |
+| Install | Declares `dsh.bundle`, so `dsh plugin add` registers it as a profile layer automatically — no manual patch editing |
+
+Install verification: `dsh plugin --profile web add github:lucyVan/dsh-publish-github` was run in an isolated `DSH_HOME`.
 
 ## Uninstall
 
