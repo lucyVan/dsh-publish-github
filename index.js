@@ -34,6 +34,84 @@ const DEFAULT_TIMEOUT_MS = 180_000
 const FORBIDDEN = /\b(force|--force|delete|reset)\b/i
 
 /**
+ * Split a command line into arguments, honouring double and single quotes so a
+ * path with spaces survives intact on every platform (`"C:\\My Projects\\x"`).
+ * A backslash escapes the next character inside double quotes only, which keeps
+ * Windows paths like `C:\\Users\\me` intact.
+ * @param {string} line - raw composer input after the command token.
+ * @returns {string[]}
+ */
+function parseArgv(line) {
+  const argv = []
+  let current = ''
+  let quote = null
+  let started = false
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null
+      } else if (char === '\\' && quote === '"' && index + 1 < line.length
+        && (line[index + 1] === '"' || line[index + 1] === '\\')) {
+        // POSIX double-quote semantics: a backslash escapes only `"` and `\\`,
+        // so Windows paths such as "C:\\My Projects" keep their separators.
+        index += 1
+        current += line[index]
+      } else {
+        current += char
+      }
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      started = true
+      continue
+    }
+    if (/\s/.test(char)) {
+      if (started || current !== '') {
+        argv.push(current)
+        current = ''
+        started = false
+      }
+      continue
+    }
+    current += char
+    started = true
+  }
+  if (started || current !== '') argv.push(current)
+  return argv
+}
+
+/**
+ * Executable names to try for one tool, in order. Windows installations expose
+ * `gh.exe`/`git.exe`, and `execFile` does not consult PATHEXT for `.cmd`/`.bat`
+ * wrappers, so probe the explicit suffixes there.
+ * @param {string} name - bare tool name.
+ * @returns {string[]}
+ */
+function executableCandidates(name) {
+  if (process.platform !== 'win32') return [name]
+  return [name, `${name}.exe`, `${name}.cmd`, `${name}.bat`]
+}
+
+/**
+ * Run a tool, trying the platform's candidate executable names until one starts.
+ * @param {string} name - bare tool name.
+ * @param {string[]} args - arguments.
+ * @param {{cwd: string, env: NodeJS.ProcessEnv, signal?: AbortSignal, timeoutMs?: number}} options
+ * @returns {Promise<{code: number, stdout: string, stderr: string}>}
+ */
+async function runTool(name, args, options) {
+  let last = { code: 1, stdout: '', stderr: '' }
+  for (const candidate of executableCandidates(name)) {
+    last = await run(candidate, args, options)
+    // code -1 means the executable itself could not be started; try the next name.
+    if (last.code !== -1) return last
+  }
+  return last
+}
+
+/**
  * Run one command and capture its output.
  * @param {string} cmd - executable name.
  * @param {string[]} args - arguments.
@@ -53,9 +131,13 @@ function run(cmd, args, options) {
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       },
       (error, stdout, stderr) => {
+        // `-1` means the executable itself never started (ENOENT/EACCES), which
+        // is what `runTool` uses to try the platform's next candidate name.
+        const missing = error !== null && error !== undefined
+          && (error.code === 'ENOENT' || error.code === 'EACCES')
         const raw = error === null || error === undefined ? 0 : (error.code ?? 1)
         resolvePromise({
-          code: typeof raw === 'number' ? raw : 1,
+          code: missing ? -1 : (typeof raw === 'number' ? raw : 1),
           stdout: String(stdout ?? ''),
           stderr: String(stderr ?? ''),
         })
@@ -87,26 +169,26 @@ async function readPackage(dir) {
 
 /** Whether this directory is already a git work tree. */
 async function isGitRepo(dir, env) {
-  const result = await run('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dir, env })
+  const result = await runTool('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dir, env })
   return result.code === 0 && result.stdout.trim() === 'true'
 }
 
 /** Whether the work tree has a committed HEAD. */
 async function hasHead(dir, env) {
-  const result = await run('git', ['rev-parse', '--verify', 'HEAD'], { cwd: dir, env })
+  const result = await runTool('git', ['rev-parse', '--verify', 'HEAD'], { cwd: dir, env })
   return result.code === 0
 }
 
 /** Branch name of HEAD, defaulting to main for an unborn branch. */
 async function currentBranch(dir, env) {
-  const result = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, env })
+  const result = await runTool('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, env })
   const value = result.stdout.trim()
   return value === '' || value === 'HEAD' ? 'main' : value
 }
 
 /** Existing `origin` URL, when one is configured. */
 async function originOf(dir, env) {
-  const result = await run('git', ['remote', 'get-url', 'origin'], { cwd: dir, env })
+  const result = await runTool('git', ['remote', 'get-url', 'origin'], { cwd: dir, env })
   return result.code === 0 ? result.stdout.trim() : undefined
 }
 
@@ -164,7 +246,7 @@ async function storedToken(ctx) {
 async function publish(argv, ctx) {
   const dirArg = argv[0]
   if (typeof dirArg !== 'string' || dirArg.trim() === '') {
-    return { ok: false, text: 'usage: /publish <directory> [--private] [--name <repo>] [--message <msg>]' }
+    return { ok: false, text: 'usage: /publish <directory> [--private] [--name <repo>] [--message <msg>] [--author <name>] [--email <addr>]' }
   }
   // Safety checks run before any filesystem or process work, so a destructive
   // request is refused no matter whether the directory exists.
@@ -181,6 +263,8 @@ async function publish(argv, ctx) {
   }
   const privateRepo = flags.includes('--private')
   const message = readFlag('--message') ?? ''
+  const authorName = readFlag('--author') ?? ''
+  const authorEmail = readFlag('--email') ?? ''
 
   const repoName = String(readFlag('--name') ?? basename(dir)).trim()
   if (!/^[A-Za-z0-9._-]+$/.test(repoName)) {
@@ -193,30 +277,30 @@ async function publish(argv, ctx) {
   const steps = [line(true, 'directory', dir)]
   if (pkg !== undefined) steps.push(line(true, 'package', typeof pkg.name === 'string' ? pkg.name : '(unnamed)'))
 
-  if ((await run('gh', ['--version'], { cwd: dir, env })).code !== 0) {
-    return { ok: false, text: [...steps, line(false, 'gh', 'not found — install with brew install gh')].join('\n') }
+  if ((await runTool('gh', ['--version'], { cwd: dir, env })).code !== 0) {
+    return { ok: false, text: [...steps, line(false, 'gh', 'not found — install it (https://cli.github.com) and restart DSH')].join('\n') }
   }
-  if ((await run('git', ['--version'], { cwd: dir, env })).code !== 0) {
+  if ((await runTool('git', ['--version'], { cwd: dir, env })).code !== 0) {
     return { ok: false, text: [...steps, line(false, 'git', 'not found on PATH')].join('\n') }
   }
   steps.push(line(true, 'auth', token === '' ? 'no stored GITHUB_TOKEN; using the gh login' : 'using the stored GITHUB_TOKEN'))
 
   if (!(await isGitRepo(dir, env))) {
-    const init = await run('git', ['init'], { cwd: dir, env })
+    const init = await runTool('git', ['init'], { cwd: dir, env })
     steps.push(line(init.code === 0, 'git init', init.code === 0 ? '' : lastLine(init.stderr)))
     if (init.code !== 0) return { ok: false, text: steps.join('\n') }
   } else {
     steps.push(line(true, 'git', 'already a work tree'))
   }
 
-  await run('git', ['add', '-A'], { cwd: dir, env })
+  await runTool('git', ['add', '-A'], { cwd: dir, env })
   if (!(await hasHead(dir, env))) {
     const commitMessage = message !== '' ? message : `Publish ${repoName}`
     const commit = await run(
       'git',
       [
-        '-c', 'user.name=DSH',
-        '-c', 'user.email=dsh@localhost',
+        ...authorName !== '' ? ['-c', `user.name=${authorName}`] : [],
+        ...authorEmail !== '' ? ['-c', `user.email=${authorEmail}`] : [],
         'commit', '-m', commitMessage,
       ],
       { cwd: dir, env }
@@ -229,12 +313,12 @@ async function publish(argv, ctx) {
   const origin = await originOf(dir, env)
   if (origin !== undefined) {
     steps.push(line(true, 'remote', origin))
-    const push = await run('git', ['push', '-u', 'origin', branch], { cwd: dir, env })
+    const push = await runTool('git', ['push', '-u', 'origin', branch], { cwd: dir, env })
     steps.push(line(push.code === 0, `push ${branch}`, push.code === 0 ? '' : lastLine(push.stderr)))
     return { ok: push.code === 0, text: steps.join('\n') }
   }
 
-  const create = await run('gh', [
+  const create = await runTool('gh', [
     'repo', 'create', repoName,
     '--source', '.',
     '--remote', 'origin',
@@ -259,10 +343,10 @@ export function apply(ctx) {
   ctx.effect(() => ctx.commands.register({
     name: 'publish',
     description: 'Publish a local directory to GitHub (git init, repo create, commit, push)',
-    input: { hint: '<directory> [--private] [--name <repo>] [--message <msg>]' },
+    input: { hint: '<directory> [--private] [--name <repo>] [--message <msg>] [--author <name>] [--email <addr>]' },
     handler: async (invocation) => {
       const raw = typeof invocation?.rawInput === 'string' ? invocation.rawInput : ''
-      const argv = raw.trim() === '' ? [] : raw.trim().split(/\s+/)
+      const argv = parseArgv(raw)
       try {
         const result = await publish(argv, ctx)
         return { kind: result.ok ? 'success' : 'error', text: result.text }
